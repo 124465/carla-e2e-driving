@@ -1,0 +1,17 @@
+# CARLA end-to-end IL — dependencies (py3.10 venv managed by uv)
+# Install with:  uv pip install -r requirements.txt
+# (after `uv venv --python 3.10` inside carla_e2e/)
+
+# --- Deep learning (CUDA 12.1 wheel works with driver 576 / CUDA 12.9) ---
+torch==2.4.1+cu121
+--extra-index-url https://download.pytorch.org/whl/cu121
+
+# --- CARLA client library (works with the 0.9.15 simulator binary) ---
+carla==0.9.15
+
+# --- data / utils ---
+numpy>=1.24,<2.0
+pillow>=10.0
+pyyaml>=6.0
+tensorboard>=2.15
+tqdm>=4.66

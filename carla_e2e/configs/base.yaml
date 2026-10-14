@@ -1,0 +1,61 @@
+# ============================================================
+# CARLA 端到端模仿学习（行为克隆）配置
+# 针对 GTX 1650 4GB 显存优化：低分辨率 + 小模型 + 离屏渲染
+# ============================================================
+# 仿真后端：pybullet（轻量/离屏/不写盘，默认）或 carla（需单独下载 8GB）
+backend: "pybullet"
+
+carla:
+  host: "127.0.0.1"
+  port: 2000
+  town: "Town01"            # 先用小地图，跑通后再换 Town03/Town10HD
+  image_width: 160          # 低分辨率，1650 4GB 友好
+  image_height: 80
+  fov: 90.0
+  fixed_delta_seconds: 0.05 # 20Hz 同步模式
+  target_speed: 30.0        # autopilot 目标速度 km/h
+
+pybullet:
+  image_width: 160
+  image_height: 80
+  fov: 90.0
+  target_speed: 12.0        # racecar 巡航速度 m/s
+  waypoint_radius: 1.5
+  max_steps: 1000
+
+model:
+  backbone: "tiny_cnn"
+  hidden_dim: 256
+  dropout: 0.2
+
+training:
+  batch_size: 64
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  epochs: 30
+  val_split: 0.1
+  num_workers: 2
+  # ---- 缓解分布漂移（covariate shift）----
+  loss_weights: [1.0, 0.7, 0.3]   # steer, throttle, brake
+  seed: 42
+  checkpoint_dir: "checkpoints"
+  log_dir: "logs"
+
+data:
+  raw_dir: "data/raw"        # 存放 meta_runXX.jsonl + images/
+  img_size: [80, 160]        # (H, W)
+
+evaluate:
+  episodes: 5
+  max_steps: 1000
+  out_dir: "logs/eval"
+
+# ---- DAgger (Dataset Aggregation) ----
+dagger:
+  rounds: 3                 # 重新聚合+重训的轮数
+  episodes_per_round: 5
+  steps_per_episode: 600
+  mix_prob: 0.5             # beta: 以该概率让策略(而非专家)执行一步 -> 让数据覆盖策略访问到的状态
+  beta_decay: 0.7           # 每轮 beta *= beta_decay (逐步回到专家主导)
+  seed: 42
+  out_dir: "data/raw"       # 聚合数据写回 data/raw/meta_dagger_XX.jsonl
