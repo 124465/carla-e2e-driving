@@ -122,6 +122,52 @@ ros2 run carla_e2e_pkg driving_policy_node \
 
 ---
 
+## 性能剖析：GPU 到底用上了吗？（`scripts/profile_perf.py`）
+
+先给结论，全部来自实测（GTX 1650 4GB，Ubuntu 24.04 WSL2）：
+
+| 环节 | 实际状态 | 证据 |
+|------|----------|------|
+| **训练** | ✅ 已在 GPU 上 | `train.py` 默认 `--device cuda`；CPU 占用从 40%→8% |
+| **仿真采集** | ❌ CPU 瓶颈，**无法**上 GPU | `_render()` 占单步 **82%**，软件光栅化 |
+| **PyBullet 硬件渲染** | ❌ 本安装不支持 | `p.EGL` 不存在；`ER_BULLET_HARDWARE_OPENGL` 实测 **GPU 占用 0%** |
+
+```bash
+python scripts/profile_perf.py           # 全部探测
+python scripts/profile_perf.py --quick   # 跳过较慢项
+```
+
+### 关于「CPU 占用 20%」
+那是 **PyBullet 软件渲染**，不是训练：
+- 单 env 采集：**125 steps/s**，其中 `_render()` 6.5ms / 单步 8.0ms = **82%**
+- 占用约 **94% 单核 ≈ 16% of 6 核**（你观察到的 ~20%）
+
+**为什么 GPU 用不上**：本 pip 版 pybullet wheel 未编译 EGL 支持（`p.EGL` 不存在，强连会 core dump）；
+`ER_BULLET_HARDWARE_OPENGL` 枚举虽有，但 DIRECT 模式下静默回退软件渲染 —— 实测渲染时 GPU 利用率恒为 **0%**。
+要真正 GPU 渲染需要自行编译带 EGL 的 pybullet，或换 GPU 原生仿真器（Isaac Sim / CARLA）。
+
+### 实际有效的优化：多进程并行采集（`scripts/collect_parallel.py`）
+既然单步 82% 是 CPU 渲染，就用多核并行多个仿真器：
+
+```bash
+python scripts/collect_parallel.py --workers 6 --runs 6 --steps 400
+```
+实测 **3.7x 加速**（1800 帧 3.9s vs 单 env 约 14.4s）。
+
+### GPU 驻留数据集（`carla_e2e/fast_data.py`）
+把整个数据集一次性解码进显存（uint8），训练时在 GPU 上归一化，**无 DataLoader worker、无逐 epoch 磁盘解码**：
+
+```bash
+python scripts/train.py --data gpu --amp     # 批大小自动按显存选择
+python scripts/train.py --data disk          # 原始磁盘路径（CPU 回退）
+```
+- 稳态 **~1835 samples/s**（disk 路径 ~1330 samples/s），10 epoch 全程 **12.7s**
+- 诚实说明：在**当前这个 ~1200 帧的小数据集**上收益有限（wall time 只快约 1.3x），
+  因为此时瓶颈是 Python/launch 开销而非磁盘解码；**数据量到几十万帧时**收益才显著。
+- `--amp` 用 fp16 混合精度，进一步降低显存与耗时。
+
+---
+
 ## 面试可讲的硬核点（提前背熟）
 
 1. **为什么端到端？vs 模块化？**
