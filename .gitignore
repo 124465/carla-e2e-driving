@@ -33,6 +33,7 @@ __pycache__/
 *.swp
 
 # ===== tensorboard event files (regenerated on every training run) =====
+carla_e2e/logs/**/events.out.tfevents.*
 carla_e2e/logs/events.out.tfevents.*
 
 # ===== scene-specific collected datasets (regenerate with collect.py) =====
