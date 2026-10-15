@@ -158,16 +158,22 @@ class CarlaEnv:
 
 
 def make_env(backend: str = "pybullet", carla_cfg: "EnvConfig | None" = None,
-             pybullet_cfg: "object | None" = None):
-    """Factory: returns a CarlaEnv or PyBulletEnv with a unified interface.
+             pybullet_cfg: "object | None" = None,
+             scene_cfg: "object | None" = None):
+    """Factory: returns a CarlaEnv / PyBulletEnv / DynamicDrivingEnv.
 
-    Both expose:
+    All expose:
         reset(autopilot=True/False) -> (obs, info)
         step(action=None|np.array, autopilot=bool) -> (obs, info)
         query_expert_control() -> np.ndarray([steer, throttle, brake])
         close()
 
-    Set backend in configs/base.yaml -> carla.backend / top-level "backend".
+    Backends:
+      * "pybullet"  - simple empty oval (original, easiest task)
+      * "dynamic"   - ring road with two lanes, traffic lights, moving traffic
+                      and car-following (harder task, richer info dict)
+      * "carla"     - real CARLA simulator (needs the 8GB download)
+
     PyBullet is the default: lightweight, offscreen, SSD-friendly.
     """
     if backend == "carla":
@@ -175,4 +181,7 @@ def make_env(backend: str = "pybullet", carla_cfg: "EnvConfig | None" = None,
     elif backend == "pybullet":
         from .pybullet_env import PyBulletEnv, PyBulletConfig
         return PyBulletEnv(pybullet_cfg or PyBulletConfig())
+    elif backend == "dynamic":
+        from .dynamic_env import DynamicDrivingEnv, DynamicSceneConfig
+        return DynamicDrivingEnv(scene_cfg or DynamicSceneConfig())
     raise ValueError(f"unknown backend: {backend}")

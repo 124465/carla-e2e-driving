@@ -23,6 +23,25 @@ pybullet:
   waypoint_radius: 1.5
   max_steps: 1000
 
+
+# ------------------------------------------------------------
+# 动态场景后端（dynamic）：双车道 + 红绿灯 + 动态交通 + 跟车
+# 比 pybullet 空赛道难得多，info 里带 lane_offset/light_state/lead_gap 等信号
+# ------------------------------------------------------------
+dynamic:
+  image_width: 160
+  image_height: 80
+  fov: 90.0
+  target_speed: 9.0          # 专家巡航速度 m/s
+  max_steps: 1500
+  n_traffic: 4               # 同向其他车辆数
+  traffic_speed: 6.0         # 交通车巡航速度
+  lead_brake_prob: 0.01      # 每步前车急刹概率
+  randomize_start: true      # 随机起点 -> 数据分布更广
+  seed: 0
+  lane_tol: 2.25             # 判定 off_lane 的横向阈值 (m)
+  collision_dist: 2.4
+
 model:
   backbone: "tiny_cnn"
   hidden_dim: 256

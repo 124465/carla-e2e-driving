@@ -18,7 +18,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from carla_e2e.env import make_env
+from carla_e2e.factory import build_env
 
 
 def main():
@@ -38,7 +38,7 @@ def main():
     img_dir = os.path.join(raw, "images")
     os.makedirs(img_dir, exist_ok=True)
 
-    env = make_env(backend=backend)
+    env = build_env(cfg, backend=backend)
     try:
         for run in range(1, args.runs + 1):
             run_id = f"{run:02d}"

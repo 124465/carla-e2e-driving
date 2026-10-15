@@ -28,7 +28,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from carla_e2e.env import make_env
+from carla_e2e.factory import build_env
 from carla_e2e.models import get_model
 from carla_e2e.dataset import BCDataset
 
@@ -55,7 +55,7 @@ def expert_label(env: CarlaEnv):
 
 def run_round(round_i, beta, cfg, model, device, writer):
     backend = cfg.get("backend", "pybullet")
-    env = make_env(backend=backend)
+    env = build_env(cfg, backend=backend)
     m_cfg, d_cfg, dg = cfg["model"], cfg["data"], cfg["dagger"]
     mean = np.array(BCDataset.MEAN).reshape(3, 1, 1)
     std = np.array(BCDataset.STD).reshape(3, 1, 1)

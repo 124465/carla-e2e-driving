@@ -19,7 +19,7 @@ from PIL import Image, ImageDraw
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from carla_e2e.env import make_env
+from carla_e2e.factory import build_env
 from carla_e2e.models import get_model
 from carla_e2e.dataset import BCDataset
 
@@ -73,7 +73,7 @@ def main():
                                      weights_only=True))
     model.eval()
 
-    env = make_env(backend=backend)
+    env = build_env(cfg, backend=backend)
     mean = np.array(BCDataset.MEAN).reshape(3, 1, 1)
     std = np.array(BCDataset.STD).reshape(3, 1, 1)
 
