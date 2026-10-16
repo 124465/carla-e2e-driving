@@ -61,7 +61,7 @@ training:
   log_dir: "logs"
 
 data:
-  raw_dir: "data/dynamic_v5" # 存放 meta_runXX.jsonl + images/
+  raw_dir: "data/dynamic_v7" # 存放 meta_runXX.jsonl + images/
   img_size: [80, 160]        # (H, W)
 
 evaluate:
@@ -71,10 +71,10 @@ evaluate:
 
 # ---- DAgger (Dataset Aggregation) ----
 dagger:
-  rounds: 3                 # 重新聚合+重训的轮数
-  episodes_per_round: 5
-  steps_per_episode: 600
+  rounds: 2                 # 重新聚合+重训的轮数
+  episodes_per_round: 4
+  steps_per_episode: 400
   mix_prob: 0.5             # beta: 以该概率让策略(而非专家)执行一步 -> 让数据覆盖策略访问到的状态
   beta_decay: 0.7           # 每轮 beta *= beta_decay (逐步回到专家主导)
   seed: 42
-  out_dir: "data/raw"       # 聚合数据写回 data/raw/meta_dagger_XX.jsonl
+  out_dir: "data/dagger_v7"       # 聚合数据写回 data/raw/meta_dagger_XX.jsonl

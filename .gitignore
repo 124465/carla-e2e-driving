@@ -43,3 +43,6 @@ carla_e2e/data/*/images/
 # ===== trained checkpoint variants from architecture benchmarks =====
 carla_e2e/checkpoints/*_best.pt
 carla_e2e/logs/bench_models.json
+
+# ===== DAgger aggregated data =====
+carla_e2e/data/dagger_v7/
