@@ -55,7 +55,10 @@ training:
   val_split: 0.1
   num_workers: 2
   # ---- 缓解分布漂移（covariate shift）----
-  loss_weights: [1.0, 0.7, 0.3]   # steer, throttle, brake
+  loss_weights: [1.0, 0.7, 1.5]   # steer, throttle, brake
+  # brake 权重从 0.3 提到 1.5: brake 标签 94.7% <=0.1(稀疏), 低权重会让
+  # 模型倾向'不刹车'(闭环红灯违规 12~18 步)。实测 brake corr
+  # +0.501 -> +0.736, steer corr 也同时改善。
   seed: 42
   checkpoint_dir: "checkpoints"
   log_dir: "logs"

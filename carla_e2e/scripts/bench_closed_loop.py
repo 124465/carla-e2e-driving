@@ -31,6 +31,7 @@ DEFAULT_MODELS = [
     ("stack_T4", "checkpoints/v7_temporal_cnn_best.pt", "temporal_cnn", 4),
     ("dagger_r00", "checkpoints/dagger_best_r00.pt", "tiny_cnn", 1),
     ("dagger_r01", "checkpoints/dagger_best_r01.pt", "tiny_cnn", 1),
+    ("gru_T8", "checkpoints/v7_gru_best.pt", "gru", 8),
 ]
 
 
