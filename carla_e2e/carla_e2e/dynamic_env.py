@@ -42,10 +42,18 @@ _LANE_W = 3.0
 _LANE_OFFSETS = (-_LANE_W / 2, +_LANE_W / 2)   # inner (right) and outer (left)
 
 # Traffic lights: positions as fractions of the ring, and a duty cycle.
+# The cycle is tuned against the lap time. The track is ~289 m and the expert
+# cruises near 7.7 m/s, so a lap takes ~37 s and the vehicle reaches a light
+# every ~19 s. With the original 6/1.5/5 s cycle (12.5 s period, 40% red) the
+# phases drifted and the vehicle almost always arrived on green: measured over
+# a full run, the light was red for 590 steps but the distance to the stop line
+# was under 20 m on only 5 of them and under 10 m on none, so the expert never
+# once had to stop and no red-light behaviour existed in the data at all.
+# A longer red fraction and a shorter period make a red encounter unavoidable.
 _LIGHT_FRACS = (0.25, 0.75)
-_LIGHT_GREEN = 6.0        # seconds green
+_LIGHT_GREEN = 4.0        # seconds green
 _LIGHT_YELLOW = 1.5
-_LIGHT_RED = 5.0
+_LIGHT_RED = 8.0          # 59% of the cycle is red
 _LIGHT_STOP_DIST = 6.0    # stop line is this far before the light
 
 
@@ -414,21 +422,47 @@ class DynamicDrivingEnv:
 
         dist, frac, _ = self._ego_light()
         state = self.light_state(frac)
-        if state in ("red", "yellow") and dist < 35.0:
-            v_des = min(v_des, max(0.0, (dist - _LIGHT_STOP_DIST) * 0.45))
+        if state in ("red", "yellow"):
+            # Allowed speed from the distance actually needed to stop.
+            # v = sqrt(2*a*d) is the speed you can still be carrying and stop
+            # within d. Using it directly as a cap is WRONG when d is large: at
+            # 35 m with a = 6 it returns 20 m/s, far above the 7 m/s cruise, so
+            # min() never binds and the vehicle sails through. The cap only has
+            # to bite when the braking distance for the *current* speed exceeds
+            # the remaining gap, so compare distances instead:
+            #     d_need = v^2 / (2a);   if d_need > stop_gap -> slow down
+            stop_gap = max(0.0, dist - _LIGHT_STOP_DIST)
+            v = ego.speed
+            d_need = (v * v) / (2.0 * 6.0)
+            if d_need > stop_gap:
+                # highest speed that still stops within the remaining gap
+                v_des = min(v_des, math.sqrt(max(0.0, 2.0 * 6.0 * stop_gap)))
 
         gap, lead_v = self._nearest_traffic_ahead()
         if gap < 20.0:
             v_des = min(v_des, max(0.0, lead_v + (gap - 6.0) * 0.8))
 
-        # ---- throttle / brake from speed error ----
-        dv = v_des - ego.speed
-        if dv >= 0:
-            throttle = float(np.clip(0.35 + dv * 0.30, 0.0, 1.0))
+        # ---- throttle / brake: track v_des through the actual plant model ----
+        # The previous version applied throttle = 0.35 + 0.30*dv whenever dv >= 0.
+        # Because throttle has a 0.35 floor and the plant is
+        #     a = throttle*7 - brake*12 - 0.35*v,
+        # a 0.35 throttle at v = 4.8 m/s yields a = +0.76 m/s^2, i.e. it
+        # ACCELERATES even when the desired speed is exactly the current speed.
+        # The expert therefore never braked for a red light (measured: brake
+        # stayed 0.000 while throttle rose to 0.8, and the vehicle passed the
+        # stop line at 4.8 m/s). Inverting the plant gives a command that
+        # actually follows v_des.
+        v = ego.speed
+        a_des = float(np.clip(1.5 * (v_des - v), -12.0, 7.0))   # m/s^2
+        drag = 0.35 * v
+        if a_des >= drag:
+            # need positive drive: throttle*7 = a_des + drag
+            throttle = float(np.clip((a_des + drag) / 7.0, 0.0, 1.0))
             brake = 0.0
         else:
+            # need to decelerate: brake*12 = drag - a_des
             throttle = 0.0
-            brake = float(np.clip(-0.18 * dv, 0.0, 1.0))
+            brake = float(np.clip((drag - a_des) / 12.0, 0.0, 1.0))
         return np.array([steer, throttle, brake], dtype=np.float32)
 
     # ------------------------------------------------------------ dynamics
