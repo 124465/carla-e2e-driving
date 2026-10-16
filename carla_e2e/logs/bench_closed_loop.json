@@ -1,0 +1,80 @@
+[
+  {
+    "lane_mean": 1.566681492611145,
+    "lane_p95": 5.930714273452758,
+    "lane_max": 11.202502250671387,
+    "off_pct": 17.333333333333332,
+    "red_violations": 18,
+    "distance": 140.26566364616156,
+    "survival": "3/3",
+    "name": "BC_single",
+    "backbone": "tiny_cnn",
+    "n_frames": 1,
+    "checkpoint": "checkpoints/v7_tiny_cnn_best.pt"
+  },
+  {
+    "lane_mean": 22.023558325047293,
+    "lane_p95": 77.32775382995604,
+    "lane_max": 96.06748962402344,
+    "off_pct": 91.08333333333333,
+    "red_violations": 0,
+    "distance": 128.28261966009936,
+    "survival": "3/3",
+    "name": "stack_T4",
+    "backbone": "temporal_cnn",
+    "n_frames": 4,
+    "checkpoint": "checkpoints/v7_temporal_cnn_best.pt"
+  },
+  {
+    "lane_mean": 1.334722549331685,
+    "lane_p95": 4.303002858161925,
+    "lane_max": 11.202753067016602,
+    "off_pct": 19.166666666666668,
+    "red_violations": 10,
+    "distance": 149.11190199075887,
+    "survival": "3/3",
+    "name": "dagger_r00",
+    "backbone": "tiny_cnn",
+    "n_frames": 1,
+    "checkpoint": "checkpoints/dagger_best_r00.pt"
+  },
+  {
+    "lane_mean": 1.0600307103556892,
+    "lane_p95": 2.869793522357931,
+    "lane_max": 11.202885627746582,
+    "off_pct": 8.416666666666666,
+    "red_violations": 0,
+    "distance": 125.06814815290272,
+    "survival": "3/3",
+    "name": "dagger_r01",
+    "backbone": "tiny_cnn",
+    "n_frames": 1,
+    "checkpoint": "checkpoints/dagger_best_r01.pt"
+  },
+  {
+    "lane_mean": 1.3352926220806935,
+    "lane_p95": 3.7799016714096068,
+    "lane_max": 11.20285415649414,
+    "off_pct": 16.833333333333332,
+    "red_violations": 7,
+    "distance": 128.2101919700702,
+    "survival": "3/3",
+    "name": "gru_T8",
+    "backbone": "gru",
+    "n_frames": 8,
+    "checkpoint": "checkpoints/v7_gru_best.pt"
+  },
+  {
+    "lane_mean": 1.1559580422161768,
+    "lane_p95": 2.9404264688491812,
+    "lane_max": 11.202380180358887,
+    "off_pct": 9.25,
+    "red_violations": 7,
+    "distance": 146.43745455642542,
+    "survival": "3/3",
+    "name": "v8_best",
+    "backbone": "tiny_cnn",
+    "n_frames": 1,
+    "checkpoint": "checkpoints/best.pt"
+  }
+]

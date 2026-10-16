@@ -50,3 +50,5 @@ carla_e2e/logs/bench_models.json
 
 # ===== DAgger aggregated data =====
 carla_e2e/data/dagger_v7/
+carla_e2e/checkpoints/v5_single_best.pt
+carla_e2e/checkpoints/v6_tiny_cnn_best.pt
