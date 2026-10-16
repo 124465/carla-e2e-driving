@@ -116,6 +116,7 @@ class DynamicDrivingEnv:
         self.traffic_bodies: List[int] = []
         self.light_bodies: List[int] = []
         self.road_bodies: List[int] = []
+        self.lamp_bodies: List[int] = []
         # lane reference for road markings; the ego does not exist yet
         self._road_lane = 1
         self._build_road()
@@ -189,18 +190,43 @@ class DynamicDrivingEnv:
                 self.road_bodies.append(add_line(s, 0.0, yellow, 0.05, z=0.021))
 
     def _build_static_markers(self):
-        """Traffic-light posts rendered as thin boxes near the stop lines."""
+        """Traffic-light posts, with a lamp that changes colour with the state.
+
+        The post alone is not enough: it was previously a fixed red box, so the
+        image never showed whether the light was red or green. The policy then
+        drove straight through red lights (measured: throttle held at 0.4-0.76
+        while the light was red for 20 consecutive steps). The lamp colour is
+        now updated every step from light_state(), exactly as the road markings
+        are drawn from the real geometry.
+        """
         p = self.p
-        col = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.15, 0.15, 1.2])
         for frac in _LIGHT_FRACS:
             a = 2 * math.pi * frac
             r = _RING_R + _LANE_W
             x, y = r * math.cos(a), r * math.sin(a)
-            vis = p.createVisualShape(
-                p.GEOM_BOX, halfExtents=[0.15, 0.15, 1.2],
-                rgbaColor=[0.9, 0.1, 0.1, 1.0])
-            b = p.createMultiBody(0, col, vis, [x, y, 1.2])
+            # post
+            vis = p.createVisualShape(p.GEOM_BOX,
+                                      halfExtents=[0.15, 0.15, 1.2],
+                                      rgbaColor=[0.15, 0.15, 0.18, 1.0])
+            b = p.createMultiBody(0, -1, vis, [x, y, 1.2])
             self.light_bodies.append(b)
+            # lamp: a large coloured box facing the approaching driver. Sized to
+            # stay visible at 160x80 so the state is readable from the image.
+            lamp = p.createVisualShape(p.GEOM_BOX,
+                                       halfExtents=[0.45, 0.45, 0.45],
+                                       rgbaColor=[0.9, 0.1, 0.1, 1.0])
+            lb = p.createMultiBody(0, -1, lamp, [x, y, 2.6])
+            self.lamp_bodies.append(lb)
+
+    def _update_lamps(self):
+        """Colour each lamp from its current light state (called every step)."""
+        p = self.p
+        colors = {"green": [0.1, 0.9, 0.2, 1.0],
+                  "yellow": [0.95, 0.8, 0.1, 1.0],
+                  "red": [0.95, 0.1, 0.1, 1.0]}
+        for body, frac in zip(self.lamp_bodies, _LIGHT_FRACS):
+            st = self.light_state(frac)
+            p.changeVisualShape(body, -1, rgbaColor=colors[st])
 
     def _radius_variation(self, s):
         """Radius offset vs arc length -> tight corners and short straights.
@@ -318,6 +344,7 @@ class DynamicDrivingEnv:
             for _ in self.traffic
         ]
         self._sync_visuals()
+        self._update_lamps()
         self._last_obs = self._render()
         return self._last_obs, self._get_info()
 
@@ -531,6 +558,7 @@ class DynamicDrivingEnv:
         self._integrate(action)
         self._integrate_traffic(dt)
         self._sync_visuals()
+        self._update_lamps()
         self.p.stepSimulation()
         self._last_obs = self._render()
         return self._last_obs, self._get_info()

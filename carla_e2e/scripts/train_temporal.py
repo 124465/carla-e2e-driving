@@ -84,12 +84,27 @@ def main():
     perm = torch.randperm(n_total, device=device)
     va, trn = perm[:n_val], perm[n_val:]
 
+    # Keep uint8 images on the device and normalize per batch. Materialising the
+    # whole split as float32 needs N*T*3*H*W*4 bytes (T=4 -> ~5.9 GB, T=8 ->
+    # ~12 GB) and OOMs a 4 GB card, which is exactly how the first attempt at
+    # this comparison failed. `gather`/`normalize` already do the conversion, so
+    # store index tensors instead of image tensors.
     if temporal:
-        Xtr, Ytr = ds.gather(trn)
-        Xva, Yva = ds.gather(va)
+        tr_idx = trn
+        va_idx = va
+        Ytr = ds.win_act[trn]
+        Yva = ds.win_act[va]
+
+        def get_x(idx):
+            return ds.gather(idx)[0]
     else:
-        Xtr, Ytr = ds.normalize(ds.images[trn]), ds.actions[trn]
-        Xva, Yva = ds.normalize(ds.images[va]), ds.actions[va]
+        tr_idx = trn
+        va_idx = va
+        Ytr = ds.actions[trn]
+        Yva = ds.actions[va]
+
+        def get_x(idx):
+            return ds.normalize(ds.images[idx])
 
     if args.batch_size == "auto":
         free, _ = torch.cuda.mem_get_info() if device.type == "cuda" else (2**31, 1)
@@ -137,14 +152,15 @@ def main():
     def run_epoch(train: bool):
         model.train(train)
         total, seen = 0.0, 0
-        X, Y = (Xtr, Ytr) if train else (Xva, Yva)
-        n = len(X)                      # size of THIS split, not of trn
-        idx = torch.randperm(n, device=device) if train \
+        idx_all, Y = (tr_idx, Ytr) if train else (va_idx, Yva)
+        n = len(idx_all)
+        order = torch.randperm(n, device=device) if train \
             else torch.arange(n, device=device)
         with torch.set_grad_enabled(train):
             for i in range(0, n, bs):
-                sel = idx[i:i + bs]
-                xb = prep(X[sel]); yb = Y[sel]
+                sel = order[i:i + bs]
+                # normalise only this batch (uint8 stays resident on the GPU)
+                xb = prep(get_x(idx_all[sel])); yb = Y[sel]
                 with torch.autocast("cuda", dtype=torch.float16,
                                     enabled=args.amp and device.type == "cuda"):
                     loss = (crit(model(xb), yb) * w).mean()

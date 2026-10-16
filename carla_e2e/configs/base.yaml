@@ -3,7 +3,7 @@
 # 针对 GTX 1650 4GB 显存优化：低分辨率 + 小模型 + 离屏渲染
 # ============================================================
 # 仿真后端：pybullet（轻量/离屏/不写盘，默认）或 carla（需单独下载 8GB）
-backend: "pybullet"
+backend: "dynamic"   # pybullet(空赛道) | dynamic(双车道+红绿灯+交通) | carla
 
 carla:
   host: "127.0.0.1"
@@ -61,7 +61,7 @@ training:
   log_dir: "logs"
 
 data:
-  raw_dir: "data/raw"        # 存放 meta_runXX.jsonl + images/
+  raw_dir: "data/dynamic_v5" # 存放 meta_runXX.jsonl + images/
   img_size: [80, 160]        # (H, W)
 
 evaluate:
