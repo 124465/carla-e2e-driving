@@ -40,8 +40,12 @@ carla_e2e/logs/events.out.tfevents.*
 carla_e2e/data/dynamic*/
 carla_e2e/data/*/images/
 
-# ===== trained checkpoint variants from architecture benchmarks =====
-carla_e2e/checkpoints/*_best.pt
+# ===== architecture-benchmark checkpoint variants (regenerate; see README) =====
+carla_e2e/checkpoints/v7_*_best.pt
+carla_e2e/checkpoints/single_*_best.pt
+carla_e2e/checkpoints/stack*_best.pt
+carla_e2e/checkpoints/gru*_best.pt
+carla_e2e/checkpoints/dagger_best_r0*.pt
 carla_e2e/logs/bench_models.json
 
 # ===== DAgger aggregated data =====
