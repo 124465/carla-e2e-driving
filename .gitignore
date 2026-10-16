@@ -37,7 +37,8 @@ carla_e2e/logs/**/events.out.tfevents.*
 carla_e2e/logs/events.out.tfevents.*
 
 # ===== scene-specific collected datasets (regenerate with collect.py) =====
-carla_e2e/data/dynamic/
+carla_e2e/data/dynamic*/
+carla_e2e/data/*/images/
 
 # ===== trained checkpoint variants from architecture benchmarks =====
 carla_e2e/checkpoints/*_best.pt

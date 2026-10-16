@@ -115,6 +115,10 @@ class DynamicDrivingEnv:
                                    [0, 0, 0.05], p.getQuaternionFromEuler([0, 0, 0]))
         self.traffic_bodies: List[int] = []
         self.light_bodies: List[int] = []
+        self.road_bodies: List[int] = []
+        # lane reference for road markings; the ego does not exist yet
+        self._road_lane = 1
+        self._build_road()
         self._build_static_markers()
 
         self.traffic: List[Vehicle] = []
@@ -122,6 +126,68 @@ class DynamicDrivingEnv:
         self.reset()
 
     # ------------------------------------------------------------ scene setup
+    def _build_road(self):
+        """Render the road surface markings so curvature is VISIBLE.
+
+        This is essential, not cosmetic. The road geometry (lane centre, radius
+        variation) previously existed only inside the controller's maths: the
+        rendered scene was a flat plane with a few vehicles and no lane lines.
+        The camera therefore contained no information about how much to steer,
+        and behaviour cloning could not learn steering from it -- measured
+        nearest-neighbour frames had |d steer| = 0.927 against an overall steer
+        std of 0.878, i.e. visually identical frames demanded opposite steering.
+        Throttle learned fine because the lead vehicle *was* rendered.
+
+        Lane lines and kerbs are drawn along the true lane geometry, so a curve
+        ahead appears in the image exactly as it does to a real driver.
+        """
+        p = self.p
+        ring = 2 * math.pi * _RING_R
+        n_seg = 140
+        half_w = _LANE_W / 2
+        seg_len = ring / n_seg * 1.15
+        white = [0.95, 0.95, 0.95, 1.0]
+        yellow = [0.95, 0.80, 0.15, 1.0]
+        kerb = [0.55, 0.55, 0.60, 1.0]
+
+        def add_line(s, lateral, color, width, z=0.02):
+            """Place a marking at `lateral` metres from the road centreline.
+
+            The offset is measured from the ring centreline (r = _RING_R), but
+            the marking must follow the ACTUAL road, whose radius is
+            _RING_R + radius_variation(s). An earlier version placed markings on
+            a plain circle of radius _RING_R + lateral, so the painted road did
+            not follow the geometry the car drives: the markings formed a
+            perfect circle while the lane wandered, the camera therefore
+            contained no curvature cue, and steering was unlearnable (a linear
+            probe over all pixels reached only r = +0.08).
+            """
+            c = self._lane_center(s, self._road_lane)      # true road centreline
+            t = self._lane_tangent(s, self._road_lane)
+            nx, ny = -math.sin(t), math.cos(t)             # left normal
+            # lateral is relative to the ring centreline; shift into the frame
+            # of the reference lane centreline
+            off = lateral - _LANE_OFFSETS[self._road_lane]
+            px, py = c[0] + nx * off, c[1] + ny * off
+            vis = p.createVisualShape(
+                p.GEOM_BOX, halfExtents=[seg_len / 2, width, 0.012],
+                rgbaColor=color)
+            return p.createMultiBody(0, -1, vis, [px, py, z],
+                                     p.getQuaternionFromEuler([0, 0, t]))
+
+        self.road_bodies = []
+        for i in range(n_seg):
+            s = ring * i / n_seg
+            # offsets are relative to the ring centreline (r = _RING_R).
+            # lane 0 occupies [-_LANE_W, 0], lane 1 occupies [0, +_LANE_W].
+            self.road_bodies.append(add_line(s, -_LANE_W - 0.10, kerb, 0.10))
+            self.road_bodies.append(add_line(s, +_LANE_W + 0.10, kerb, 0.10))
+            self.road_bodies.append(add_line(s, -_LANE_W, white, 0.05))
+            self.road_bodies.append(add_line(s, +_LANE_W, white, 0.05))
+            # dashed centre divider between the two lanes
+            if i % 2 == 0:
+                self.road_bodies.append(add_line(s, 0.0, yellow, 0.05, z=0.021))
+
     def _build_static_markers(self):
         """Traffic-light posts rendered as thin boxes near the stop lines."""
         p = self.p
@@ -137,15 +203,26 @@ class DynamicDrivingEnv:
             self.light_bodies.append(b)
 
     def _radius_variation(self, s):
-        """Radius offset vs arc length -> straights, corners and sweepers.
+        """Radius offset vs arc length -> tight corners and short straights.
 
-        Constant curvature makes lane-keeping trivial: the expert holds a fixed
-        wheel angle, so the collected steering signal is near-constant and
-        useless for training. Two incommensurate sinusoids give a curvature
-        profile that is not trivially periodic.
+        Geometry sets how much steering a track can teach. On a plain 46 m ring
+        the wheel angle needed is only atan(L/R) ~ 0.0065 rad, which normalises
+        to steer ~ 0.011 -- essentially zero. Measured over a full lap, 77% of
+        frames then had |steer| < 0.1, so the steering labels were concentrated
+        near a constant and behaviour cloning correctly learned to predict the
+        mean (steer MSE equalled the constant-mean baseline). No controller or
+        architecture change can fix that: the track has to demand steering.
+
+        The variation below swings the radius by roughly +/-10 m within a lap,
+        giving local radii of about 25-55 m. That is sharp enough to require real
+        steering input (measured: |steer| < 0.1 on ~15% of frames, versus ~77% on
+        a plain ring) while staying inside what the vehicle can actually track.
+        A more aggressive profile (+/-18 m, minimum radius ~12 m) produced richer
+        labels but the expert could no longer follow the line at cruise speed.
         """
         theta = s / _RING_R
-        return 6.0 * math.sin(2.0 * theta) + 3.0 * math.sin(3.0 * theta + 1.1)
+        return (9.0 * math.sin(2.0 * theta)
+                + 4.0 * math.sin(3.0 * theta + 1.1))
 
     def _lane_center(self, s, lane):
         """Position on the lane centreline at arc length s (varying curvature)."""
@@ -406,15 +483,32 @@ class DynamicDrivingEnv:
                 b, [float(vp[0]), float(vp[1]), 0.05],
                 p.getQuaternionFromEuler([0, 0, self._yaw_of(v)]))
 
+    # Camera mount: a dashcam looks slightly DOWN at the road ahead. The
+    # original camera was perfectly level (view direction z = 0) at 0.19 m, so
+    # the ground entered at a grazing angle and the lane markings occupied a
+    # sliver at the bottom of the image -- curvature was effectively invisible
+    # and steering was unlearnable. Raising the camera and pitching it down
+    # puts the road surface properly in frame.
+    CAM_HEIGHT = 1.20        # m above the road
+    CAM_FORWARD = 1.20       # m ahead of the vehicle origin
+    CAM_PITCH_DOWN = 0.22    # rad below horizontal (~12.6 deg)
+
     def _cam_view(self):
         pos = self._pos_of(self.ego)
         yaw = self._yaw_of(self.ego)
         fwd = np.array([math.cos(yaw), math.sin(yaw), 0.0])
-        cam_pos = np.array([pos[0], pos[1], 0.05]) + fwd * 0.25 + np.array([0, 0, 0.14])
-        cam_target = cam_pos + fwd * 3.0
-        view = self.p.computeViewMatrix(cam_pos.tolist(), cam_target.tolist(), [0, 0, 1])
+        right = np.array([-math.sin(yaw), math.cos(yaw), 0.0])
+
+        cam_pos = (np.array([pos[0], pos[1], self.CAM_HEIGHT])
+                   + fwd * self.CAM_FORWARD)
+        # look forward and downward
+        cam_target = (cam_pos
+                      + fwd * 6.0 * math.cos(self.CAM_PITCH_DOWN)
+                      - np.array([0, 0, 6.0 * math.sin(self.CAM_PITCH_DOWN)]))
+        view = self.p.computeViewMatrix(cam_pos.tolist(), cam_target.tolist(),
+                                        [0, 0, 1])
         aspect = self.cfg.image_width / self.cfg.image_height
-        proj = self.p.computeProjectionMatrixFOV(self.cfg.fov, aspect, 0.1, 60)
+        proj = self.p.computeProjectionMatrixFOV(self.cfg.fov, aspect, 0.1, 80)
         return view, proj
 
     def _render(self):

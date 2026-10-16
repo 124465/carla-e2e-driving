@@ -32,7 +32,7 @@ dynamic:
   image_width: 160
   image_height: 80
   fov: 90.0
-  target_speed: 9.0          # 专家巡航速度 m/s
+  target_speed: 7.0          # 专家巡航速度 m/s (赛道变窄后降低, 保证跟得上)
   max_steps: 1500
   n_traffic: 4               # 同向其他车辆数
   traffic_speed: 6.0         # 交通车巡航速度
