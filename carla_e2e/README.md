@@ -233,6 +233,29 @@ python scripts/train.py --data disk          # 原始磁盘路径（CPU 回退�
 
 
 
+
+### 🎬 冠军模型闭环演示
+
+![champion demo](logs/demo/champion_seed2.gif)
+
+`logs/demo/champion_seed2.gif` —— `dagger_best_r01.pt` 在动态场景中行驶
+（HUD 显示：红绿灯状态与距离、车速、横向偏差、转向/油门/刹车条）。
+
+| 演示 | 起始位置 | lane 均值 | off-lane | 红灯违规 | 里程 | 平均车速 |
+|------|---------|----------|----------|---------|------|---------|
+| `champion_seed2.gif` | seed 2 | **0.506 m** | **1.8%** | **0** | 160.8 m | 6.42 m/s |
+| `typical_seed0.gif` | seed 0 | 1.226 m | 16.2% | 0 | 151.7 m | 6.03 m/s |
+
+**注意：闭环表现强烈依赖起始位置。** 扫描 8 个 seed，lane 均值从
+**0.256 m 到 3.792 m**（差 15 倍）—— 这是单次评测方差极大的原因，
+也是为什么模型选择必须用 `bench_closed_loop.py` 的配对评测。
+
+重新录制：
+```bash
+python scripts/record_demo.py --checkpoint checkpoints/dagger_best_r01.pt --seed 2
+python scripts/record_demo.py --seed 4 --out logs/demo/drift.gif   # 表现差的对比
+```
+
 ### 最终结果（配对闭环评测，3 episodes x 400 steps，同 seed）
 
 | 排名 | 模型 | 骨干 | T | lane 均值 | off-lane | 红灯违规 | 里程 |
