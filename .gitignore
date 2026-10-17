@@ -45,7 +45,6 @@ carla_e2e/checkpoints/v7_*_best.pt
 carla_e2e/checkpoints/single_*_best.pt
 carla_e2e/checkpoints/stack*_best.pt
 carla_e2e/checkpoints/gru*_best.pt
-carla_e2e/checkpoints/dagger_best_r0*.pt
 carla_e2e/logs/bench_models.json
 
 # ===== DAgger aggregated data =====
